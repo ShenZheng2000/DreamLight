@@ -1,3 +1,5 @@
+dummy_inputs/
+ckpt/
 __pycache__
 *.pyc
 exp_output

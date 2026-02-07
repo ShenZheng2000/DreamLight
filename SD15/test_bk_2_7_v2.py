@@ -18,9 +18,9 @@ from ip_adapter import IPAdapterPlus
 from tqdm import tqdm
 import sys
 sys.path.append("SD15/FixDetails")
-from tqdm import tqdm
+
 from PIL import Image, ImageOps
-from pathlib import Path
+
 from util import (
     encode_prompt_pair,
     pytorch2numpy, 
@@ -274,45 +274,21 @@ def inference(input_fg_path, input_bg_path=None, prompt="", image_width=512, ima
 
 
 def main():
-    relighting_prompts_6 = {
-        "noon_sunlight_1": "Relit with bright noon sunlight in a clear outdoor setting, casting soft natural shadows and surrounding the subject in crisp white light to create a clean, vibrant daytime mood.",
-        "golden_sunlight_1": "Relit with warm golden sunlight during the late afternoon, casting gentle directional shadows and surrounding the subject in soft amber tones to create a calm, radiant mood.",
-        "foggy_1": "Relit with dense fog in a muted outdoor setting, casting soft diffused shadows and surrounding the subject in pale gray light to create a quiet, atmospheric mood.",
-        "moonlight_1": "Relit with cold moonlight in a minimalist nighttime scene, casting crisp soft shadows and bathing the subject in icy blue highlights to create a tranquil, distant mood.",
-    }
+    input_fg_path = "/home/shenzhen/Datasets/VITON/test/image/00017_00.jpg"          # required
+    gt_mask_path  = "/home/shenzhen/Datasets/VITON/test/fg_masks/00017_00.png"        # required in your current code
+    prompt = "Relit with warm golden sunlight during the late afternoon, casting gentle directional shadows and surrounding the subject in soft amber tones to create a calm, radiant mood."
 
-    relight_type = "golden_sunlight_1"
-    input_dir  = "/home/shenzhen/Datasets/VITON/test/image"
-    mask_dir   = "/home/shenzhen/Datasets/VITON/test/fg_masks"
-    output_dir = f"./outputs/{relight_type}/VITON/test/image"
+    out, crop_sizes = inference(
+        input_fg_path=input_fg_path,
+        input_bg_path=None,     # text-based (no bg)
+        prompt=prompt,
+        gt_mask_path=gt_mask_path,
+    )
 
-    prompt = relighting_prompts_6[relight_type]
-    os.makedirs(output_dir, exist_ok=True)
-
-    fnames = sorted(os.listdir(input_dir))
-
-    for fname in tqdm(fnames, desc=f"Relighting [{relight_type}]"):
-        if not fname.lower().endswith((".jpg", ".png", ".jpeg")):
-            continue
-
-        base = os.path.splitext(fname)[0]
-        input_fg_path = os.path.join(input_dir, fname)
-        gt_mask_path  = os.path.join(mask_dir, base + ".png")
-
-        if not os.path.exists(gt_mask_path):
-            continue
-
-        out, crop_sizes = inference(
-            input_fg_path=input_fg_path,
-            input_bg_path=None,
-            prompt=prompt,
-            gt_mask_path=gt_mask_path,
-        )
-
-        out = cv2.resize(out, (crop_sizes[0], crop_sizes[1]))
-        save_path = os.path.join(output_dir, fname)
-        cv2.imwrite(save_path, out)
+    # cv2.imwrite("relit.png", out)
+    cv2.imwrite("relit.png", cv2.resize(out, (crop_sizes[0], crop_sizes[1])))
 
 
+# NOTE: simple version: inference with ONE image. 
 if __name__ == "__main__":
     main()

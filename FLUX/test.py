@@ -31,7 +31,8 @@ class Args:
         self.weight_dtype = torch.bfloat16
         self.device = torch.device("cuda:0")
         self.seed = 19971021
-        self.output_model_pth = "ckpt/FLUX/transformer/model.pth"   # Trained DreamLight model path
+        # self.output_model_pth = "ckpt/FLUX/transformer/model.pth"   # Trained DreamLight model path
+        self.output_model_pth = "ckpt/FLUX/DreamLight-FLUX/transformer/model.pth"   # Trained DreamLight model path
         self.clipvision_model_path = 'ckpt/CLIP/models'   # CLIP model path
         
         self.add_bg = True
@@ -68,12 +69,15 @@ if __name__ == "__main__":
     clip_image_processor = CLIPImageProcessor()
     image_encoder = CLIPVisionModelWithProjection.from_pretrained(args.clipvision_model_path).to(device=pipeline.device)
 
-    fg_path = 'xxx/xxx'  # fg_path
-    bg_path = 'xxx/xxx'
-    env_path = 'xxx/xxx'
-    save_path = 'xxx/xxx'
-    mask_path = 'xxx/xxx'
-    prompt = 'xxx'
+    # TODO: right now cannot fill into 48 GB memory!
+    # TODO: change resizing logic to be similar to SD-based model.
+    # TODO: write into unified script for multi-processing!
+    fg_path = '/home/shenzhen/Datasets/VITON/test/image/00017_00.jpg'  # fg_path
+    bg_path = 'dummy_inputs/dummy_bg.png'
+    env_path = 'dummy_inputs/dummy_env.png'
+    save_path = 'outputs_flux/golden_sunlight_1/VITON/test/image/00017_00.png'
+    mask_path = '/home/shenzhen/Datasets/VITON/test/fg_masks/00017_00.png'  # mask_path
+    prompt = 'Relit with warm golden sunlight during the late afternoon, casting gentle directional shadows and surrounding the subject in soft amber tones to create a calm, radiant mood.'
 
     fg = Image.open(fg_path).convert("RGB")
     bg = Image.open(bg_path).convert("RGB")
@@ -147,5 +151,6 @@ if __name__ == "__main__":
                 ).images[0]
         results.append(np.array(image))
     image = Image.fromarray(np.concatenate(results, axis=1))
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
     image.save(save_path)
     

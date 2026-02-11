@@ -29,6 +29,7 @@ from util import (
     numpy2pytorch_new,
     resize_and_fg_crop,
 )
+import argparse
 
 from detail_fixer import DetailsFixer
 # detail_fixer = DetailsFixer(model_path="xxx/vqmodel")
@@ -42,7 +43,7 @@ ip_ckpt = 'ckpt/SD15/adapter.bin'
 
 device = "cuda"
 
-INVERT_MASK = True # TODO: invert the mask to be white fg and black bg
+INVERT_MASK = True # NOTE: invert the mask to be white fg and black bg
 
 sd15_name = 'stablediffusionapi/realistic-vision-v51'
 tokenizer = CLIPTokenizer.from_pretrained(sd15_name, subfolder="tokenizer")
@@ -131,7 +132,8 @@ def process(input_fg, input_bg, prompt, image_width, image_height, num_samples, 
     # bg_source: text or image
 
     rng = torch.Generator(device=device).manual_seed(seed)
-    image_height, image_width = 512, 512
+    # NOTE: STOPPED this hardcode!!!!!!!!!
+    # image_height, image_width = 512, 512
     fg, matting_u8, bbox, crop_size = resize_and_fg_crop(input_fg, matting, image_width, image_height)
     bg = np.zeros_like(fg)
 
@@ -273,7 +275,26 @@ def inference(input_fg_path, input_bg_path=None, prompt="", image_width=512, ima
     return relit_result, crop_sizes
 
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--relight_type",
+        type=str,
+        required=True,
+        choices=["noon_sunlight_1", "golden_sunlight_1", "foggy_1", "moonlight_1"],
+    )
+    parser.add_argument("--input_dir", type=str, default="/home/shenzhen/Datasets/VITON/test/image")
+    parser.add_argument("--mask_dir", type=str, default="/home/shenzhen/Datasets/VITON/test/fg_masks")
+    parser.add_argument("--out_root", type=str, default="./outputs")
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--image_width", type=int, default=512)
+    parser.add_argument("--image_height", type=int, default=512)
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+
     relighting_prompts_6 = {
         "noon_sunlight_1": "Relit with bright noon sunlight in a clear outdoor setting, casting soft natural shadows and surrounding the subject in crisp white light to create a clean, vibrant daytime mood.",
         "golden_sunlight_1": "Relit with warm golden sunlight during the late afternoon, casting gentle directional shadows and surrounding the subject in soft amber tones to create a calm, radiant mood.",
@@ -281,15 +302,17 @@ def main():
         "moonlight_1": "Relit with cold moonlight in a minimalist nighttime scene, casting crisp soft shadows and bathing the subject in icy blue highlights to create a tranquil, distant mood.",
     }
 
-    relight_type = "golden_sunlight_1"
-    input_dir  = "/home/shenzhen/Datasets/VITON/test/image"
-    mask_dir   = "/home/shenzhen/Datasets/VITON/test/fg_masks"
-    output_dir = f"./outputs/{relight_type}/VITON/test/image"
-
+    relight_type = args.relight_type
     prompt = relighting_prompts_6[relight_type]
+
+    input_dir = args.input_dir
+    mask_dir = args.mask_dir
+    fnames = sorted(os.listdir(input_dir))
+
+    output_dir = f"{args.out_root}/{TARGET_W}x{TARGET_H}/{args.relight_type}/VITON/test/image"
     os.makedirs(output_dir, exist_ok=True)
 
-    fnames = sorted(os.listdir(input_dir))
+    print(f"\n==== Running relight: {relight_type} on CUDA={os.environ.get('CUDA_VISIBLE_DEVICES','ALL')} ====\n")
 
     for fname in tqdm(fnames, desc=f"Relighting [{relight_type}]"):
         if not fname.lower().endswith((".jpg", ".png", ".jpeg")):
@@ -298,7 +321,6 @@ def main():
         base = os.path.splitext(fname)[0]
         input_fg_path = os.path.join(input_dir, fname)
         gt_mask_path  = os.path.join(mask_dir, base + ".png")
-
         if not os.path.exists(gt_mask_path):
             continue
 
@@ -307,11 +329,13 @@ def main():
             input_bg_path=None,
             prompt=prompt,
             gt_mask_path=gt_mask_path,
+            seed=args.seed,
+            image_width=args.image_width,
+            image_height=args.image_height,
         )
 
         out = cv2.resize(out, (crop_sizes[0], crop_sizes[1]))
-        save_path = os.path.join(output_dir, fname)
-        cv2.imwrite(save_path, out)
+        cv2.imwrite(os.path.join(output_dir, fname), out)
 
 
 if __name__ == "__main__":
